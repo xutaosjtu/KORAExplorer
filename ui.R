@@ -27,7 +27,7 @@ shinyUI(fluidPage(
         
         tabsetPanel(
           ## first tabPanel for plot
-          tabPanel("Hist plot", 
+          tabPanel("Histogram of phenotypes", 
                    sidebarLayout(
                      sidebarPanel(
                        textInput("KORA.var", label = "Variables", value = "utbmi"),
@@ -43,7 +43,7 @@ shinyUI(fluidPage(
                    )
           ),
           
-          tabPanel("X-Y plot", 
+          tabPanel("Associations between phenotypes (X-Y plot)", 
               sidebarLayout(
                   sidebarPanel(
                       textInput("KORA.x", label = "X = ", value = "utalter"),
@@ -56,7 +56,7 @@ shinyUI(fluidPage(
                                   selected = "scatterplot")
                     ),
                   mainPanel(
-                    plotOutput("xyplot", height = "400px", width = "800px"),
+                    plotOutput("xyplot", height = "400px"),
                     helpText("The association between the two variables in the whole population and in the subgroups are"),
                     tableOutput("asso.xy")
                     )
@@ -67,6 +67,11 @@ shinyUI(fluidPage(
               sidebarLayout(
                 sidebarPanel(
                   helpText("Please put the names of the phenotypes whose correaltions with metabolites you would like to investigate (Please separate the phenotype by ',')"),
+                  selectInput(inputId = "dataset", 
+                              label = "", 
+                              choices = c("KORA S4"='s4',
+                                          "KORA F4" = "f4"),
+                              selected = "f4"),
                   textInput("KORA.covaraites", label = "The intermediate phenotypes", 
                             value = "utalter,utbmi"),
                   selectInput(inputId= "cormethod", 

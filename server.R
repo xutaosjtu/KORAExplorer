@@ -11,10 +11,13 @@ require(RODBC)
 ch = odbcConnect("KORA_remote")
 odbcQuery(ch, "use KORA")
 KORA = sqlFetch(ch, sqtable = "S4F4")
+
 KORA.S4_bioc =  sqlQuery(ch, "select * from s4_bioc,s4f4 where s4_bioc.s4metabo_zz=s4f4.zz_nr_s4_bio")
 metabo.s4 = as.character(sqlQuery(ch, "show columns from s4_bioc")[-1,1])
+
 KORA.F4_bioc =  sqlQuery(ch, "select * from f4_bioc,s4f4 where f4_bioc.f4metabo_zz=s4f4.zz_nr_f4_bio")
 metabo.f4 = as.character(sqlQuery(ch, "show columns from f4_bioc")[-1,1])
+
 odbcClose(ch)
 
 trim <- function (x) gsub("^\\s+|\\s+$", "", x) ## trim white space before or after a string
@@ -39,21 +42,19 @@ shinyServer(function(input, output) {
   ## Scatter plot to show variable x against variable y
   output$xyplot <- renderPlot({
         
-      if(Reduce("&", 
-                Map(f = function(x) return(x %in% colnames(KORA)), 
-                    x = c(input$KORA.x, input$KORA.y, input$KORA.f))
-      )
+      if(Reduce("&", Map(f = function(x) return(x %in% colnames(KORA)), 
+                    x = c(input$KORA.x, input$KORA.y, input$KORA.f)))
       ){
         # retrieve the x and y values based on input$KORA.x and input$KORA.y from ui.R
         x = KORA[, input$KORA.x]
         y = KORA[, input$KORA.y]
-        f = KORA[, input$KORA.f]
-        data = data.frame(x=x, y=y, f=f)
+        group = KORA[, input$KORA.f]
+        data = data.frame(x=x, y=y, group=group)
         
         if(input$plot.type=="boxplot"){
         
           #draw the scatter plot with coloring by f
-          p = qplot(as.factor(x), y, data, colour=as.factor(f),
+          p = qplot(as.factor(x), y, data, colour=group,
                     ,xlab =input$KORA.x, ylab = input$KORA.y, log = input$KORA.logscale
                     , geom = c("boxplot")
                     )
@@ -61,20 +62,18 @@ shinyServer(function(input, output) {
           print(p)
         }
         else if(input$plot.type=="scatterplot"){
-          p = qplot(x, y, data, colour=as.factor(f), facets = .~ f, xlab =input$KORA.x, ylab = input$KORA.y, log = input$KORA.logscale)
-          p = p+ stat_smooth(mapping = aes(x, y, color = as.factor(f)), method = "lm") + labs(colour = input$KORA.f)
+          p = qplot(x, y, data, colour=as.factor(group), facets = .~ group, 
+                    xlab =input$KORA.x, ylab = input$KORA.y, 
+                    log = input$KORA.logscale)
+          p = p+ stat_smooth(mapping = aes(x, y, color = as.factor(group)), method = "lm") + labs(colour = input$KORA.f)
           print(p)
         }
-        #plot(x, y, col = as.factor(f), pch = 19, log = input$KORA.logscale, main = paste("Scatter plot of", input$KORA.x, "against", input$KORA.x), xlab = input$KORA.x, ylab = input$KORA.y)
-        
-        #legend("topright", legend = paste(input$KORA.f, levels(as.factor(f))), col = levels(as.factor(f)), pch =19)
     }
-      
   })
-  
   
   ##correlations between two variables
   output$asso.xy = renderTable({
+    
     
     if(Reduce("&", 
               Map(f = function(x) return(x %in% colnames(KORA)), 
@@ -89,20 +88,6 @@ shinyServer(function(input, output) {
       
       if(input$plot.type=="boxplot"){x = as.factor(x)}
       
-#       cor.all = cor.test(x, y, method = "spearman", use = "pair")
-#       cor.all = c(cor.all$estimate, cor.all$p.value)
-#       cor.sub = tapply(1:length(x), INDEX = f, 
-#                        function(t) {
-#                          tmp = cor.test(x[t], y[t], method = "spearman", use = "pair")
-#                          return(c(tmp$estimate, tmp$p.value))
-#                        }
-#                        )
-#       cor.sub = matrix(unlist(cor.sub), ncol = 2, byrow = T)
-#       rownames(cor.sub) = paste(input$KORA.f,"=", levels(f))
-#       cors = rbind(cor.all, cor.sub)
-#       rownames(cors)[1] = "all"
-#       colnames(cors) = c("correlation", "p value")
-#       
       ## linear model
       model = lm(y ~ x)
       rst.lm.all = cbind(coef(model),confint(model), summary(model)$coef[,4])
@@ -141,23 +126,27 @@ shinyServer(function(input, output) {
   ## Correlation of variables with metabolites
   output$cor_metabo = renderDataTable({
     
+    if(input$dataset=="s4"){tmpdata = KORA.S4_bioc; metabo = metabo.s4}
+    else {tmpdata = KORA.F4_bioc; metabo = metabo.f4}
+    
     require(corrplot)
     vars = sapply(strsplit(input$KORA.covaraites, split = ","), trim)
-    print(metabo.s4)
+    #print(metabo.s4)
         
-    cors = cor(KORA.S4_bioc[, metabo.s4], KORA.S4_bioc[,vars], use = "pair", method = input$cormethod)
+    cors = cor(tmpdata[, metabo], tmpdata[,vars], use = "pair", method = input$cormethod)
     ## format the correlation output
     cors = apply(cors, c(1,2), 
                  function(x){
                    if(abs(x)<0.001){
-                     format(x, scientific = T, digits = 3)
+                     as.numeric(format(x, scientific = T, digits = 3))
                    } 
                    else{
                      round(x, 3)
                    }
                  }
                  )
-    cors = cbind(Metabolites = metabo.s4, cors)
+    cors = data.frame(Metabolites = tmpdata, cors)
+    #print(head(cors))
     return(cors)
   })
   
