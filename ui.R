@@ -86,6 +86,8 @@ shinyUI(fluidPage(
                 )
           ),
           
+          tabPanel("PLS-DA", showOutput("plsPlot", "polycharts")),
+          
           ## second tab panel for showing data
           tabPanel("KORA Data", dataTableOutput("dataTable"))
         ), 

@@ -4,7 +4,7 @@
 #
 # http://shiny.rstudio.com
 #
-
+library(ggplot2)
 library(shiny)
 require(RODBC)
 
@@ -23,8 +23,6 @@ odbcClose(ch)
 trim <- function (x) gsub("^\\s+|\\s+$", "", x) ## trim white space before or after a string
 
 shinyServer(function(input, output) {
-  
-  library(ggplot2)
 
   ## Histogram to show the variable distributions
   output$histPlot <- renderPlot({
@@ -145,9 +143,21 @@ shinyServer(function(input, output) {
                    }
                  }
                  )
-    cors = data.frame(Metabolites = tmpdata, cors)
+    cors = data.frame(Metabolites = metabo, cors)
     #print(head(cors))
     return(cors)
+  })
+  
+  require(rCharts)
+  ##plsda 
+  output$plsPlot <- renderChart({
+    require(caret)
+    pls1 = plsda(x = scale(log(KORA.F4_bioc[,metabo.f4])), y = as.factor(KORA.F4_bioc$ucsex))
+    dat = data.frame(pc1 = pls1$scores[,1], pc2 = pls1$scores[,2], class = factor(KORA.F4_bioc$ucsex, labels = c("male", "female")))
+    a1 = rPlot(pc1~pc2, data = dat, color = 'class', size = list(const = 2), sample = F, type = 'point')
+    a1$set(width = 800, height = 800)
+    a1$addParams(dom = "plsPlot")
+    return(a1)
   })
   
   ## Data table
@@ -157,3 +167,4 @@ shinyServer(function(input, output) {
   }, options = list(aLengthMenu = c(10, 30, 50), iDisplayLength = 10))
 
 })
+
